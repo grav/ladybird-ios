@@ -25,6 +25,13 @@ URLs). Downloads and non-HTTP(S) links are ignored. This is URL navigation, not
 full pointer-event dispatch; forms, new windows, and fragment scrolling are not
 implemented yet.
 
+Back and Forward buttons maintain in-memory URL history. Successful loads add
+entries; failed or cancelled loads do not. Back/forward refetch the HTML and
+restore the saved scroll offset (allowing up to three seconds for asynchronous
+layout growth). Dragging cancels pending scroll restoration. Navigating to a new
+URL after going back removes the forward entries. This is not a back/forward
+document cache, and history does not persist across app launches.
+
 There is no JavaScript execution, GPU compositor, or browser
 helper process. The default LibWeb `PageClient` implementations are used for
 unimplemented browser callbacks. This is an embedding experiment, not a browser
@@ -128,3 +135,5 @@ These checks and live Hacker News stylesheet rendering passed on the simulator.
 The `/links` fixture tests nested text in a relative link under a base URL and a
 second link below the fold. Both must load `/destination`, including after
 scrolling. Blank page taps must leave the address unchanged.
+For history, follow the scrolled link, go Back, check the restored offset, and go
+Forward. Then go Back and enter a different address: Forward must be disabled.

@@ -240,6 +240,14 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
 
 }
 
+@interface DemoHistoryEntry : NSObject
+@property (strong, nonatomic) NSURL* url;
+@property (nonatomic) CGPoint scrollOffset;
+@end
+
+@implementation DemoHistoryEntry
+@end
+
 @interface DemoViewController : UIViewController <UITextFieldDelegate, UIScrollViewDelegate>
 @end
 
@@ -249,6 +257,12 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     UIScrollView* _scrollView;
     UILabel* _statusLabel;
     UITextField* _urlField;
+    UIButton* _backButton;
+    UIButton* _forwardButton;
+    NSMutableArray<DemoHistoryEntry*>* _history;
+    NSInteger _historyIndex;
+    CGPoint _restoreScrollOffset;
+    CFTimeInterval _restoreScrollUntil;
     NSURLSessionDataTask* _loadTask;
     NSUInteger _loadGeneration;
     GC::Root<DemoPageClient> _client;
@@ -261,6 +275,19 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
 {
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.whiteColor;
+    _history = [NSMutableArray array];
+    _historyIndex = NSNotFound;
+    _backButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_backButton setImage:[UIImage systemImageNamed:@"chevron.left"] forState:UIControlStateNormal];
+    _backButton.accessibilityLabel = @"Back";
+    [_backButton addTarget:self action:@selector(goBack) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:_backButton];
+    _forwardButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_forwardButton setImage:[UIImage systemImageNamed:@"chevron.right"] forState:UIControlStateNormal];
+    _forwardButton.accessibilityLabel = @"Forward";
+    [_forwardButton addTarget:self action:@selector(goForward) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:_forwardButton];
+    [self updateHistoryButtons];
     _urlField = [[UITextField alloc] init];
     _urlField.borderStyle = UITextBorderStyleRoundedRect;
     _urlField.placeholder = @"Enter URL";
@@ -347,8 +374,36 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     if (![address containsString:@"://"])
         address = [@"https://" stringByAppendingString:address];
     auto targetURL = [NSURL URLWithString:address];
+    [self loadURL:targetURL historyIndex:NSNotFound];
+}
+
+- (void)updateHistoryButtons
+{
+    _backButton.enabled = !_loadTask && _historyIndex != NSNotFound && _historyIndex > 0;
+    _forwardButton.enabled = !_loadTask && _historyIndex != NSNotFound && _historyIndex + 1 < (NSInteger)_history.count;
+}
+
+- (void)goBack
+{
+    if (_backButton.enabled)
+        [self loadURL:_history[_historyIndex - 1].url historyIndex:_historyIndex - 1];
+}
+
+- (void)goForward
+{
+    if (_forwardButton.enabled)
+        [self loadURL:_history[_historyIndex + 1].url historyIndex:_historyIndex + 1];
+}
+
+- (void)loadURL:(NSURL*)targetURL historyIndex:(NSInteger)historyIndex
+{
+    [_urlField resignFirstResponder];
     auto scheme = targetURL.scheme.lowercaseString;
+    if (_loaded && _historyIndex != NSNotFound)
+        _history[_historyIndex].scrollOffset = _scrollView.contentOffset;
+    _restoreScrollUntil = 0;
     [_loadTask cancel];
+    _loadTask = nil;
     cancel_network_requests();
     auto generation = ++_loadGeneration;
     _loaded = NO;
@@ -358,6 +413,7 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     _statusLabel.hidden = NO;
     if (!targetURL.host.length || (![scheme isEqualToString:@"https"] && ![scheme isEqualToString:@"http"])) {
         _statusLabel.text = @"Enter a valid HTTP or HTTPS URL.";
+        [self updateHistoryButtons];
         return;
     }
     _urlField.text = targetURL.absoluteString;
@@ -371,6 +427,7 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
                                                       if (generation != self->_loadGeneration)
                                                           return;
                                                       self->_loadTask = nil;
+                                                      [self updateHistoryButtons];
                                                       auto httpResponse = (NSHTTPURLResponse*)response;
                                                       if (error || !data || httpResponse.statusCode < 200 || httpResponse.statusCode >= 300) {
                                                           self->_statusLabel.text = error ? error.localizedDescription : [NSString stringWithFormat:@"Could not load page (HTTP %ld).", (long)httpResponse.statusCode];
@@ -383,6 +440,20 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
                                                           return;
                                                       }
                                                       self->_urlField.text = responseURL;
+                                                      if (historyIndex == NSNotFound) {
+                                                          auto firstForwardIndex = self->_historyIndex == NSNotFound ? 0 : self->_historyIndex + 1;
+                                                          [self->_history removeObjectsInRange:NSMakeRange(firstForwardIndex, self->_history.count - firstForwardIndex)];
+                                                          auto entry = [[DemoHistoryEntry alloc] init];
+                                                          entry.url = response.URL;
+                                                          [self->_history addObject:entry];
+                                                          self->_historyIndex = self->_history.count - 1;
+                                                      } else {
+                                                          self->_historyIndex = historyIndex;
+                                                          self->_history[historyIndex].url = response.URL;
+                                                          self->_restoreScrollOffset = self->_history[historyIndex].scrollOffset;
+                                                          self->_restoreScrollUntil = CACurrentMediaTime() + 3;
+                                                      }
+                                                      [self updateHistoryButtons];
                                                       self->_client = DemoPageClient::create();
                                                       self->_client->initialize();
                                                       self->_client->parse({ static_cast<char const*>(data.bytes), data.length }, *url);
@@ -391,13 +462,16 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
                                                   });
                                               }];
     [_loadTask resume];
+    [self updateHistoryButtons];
 }
 
 - (void)viewDidLayoutSubviews
 {
     [super viewDidLayoutSubviews];
     auto bounds = self.view.safeAreaLayoutGuide.layoutFrame;
-    _urlField.frame = CGRectMake(bounds.origin.x + 8, bounds.origin.y + 6, MAX(0, bounds.size.width - 16), 40);
+    _backButton.frame = CGRectMake(bounds.origin.x, bounds.origin.y + 4, 44, 44);
+    _forwardButton.frame = CGRectMake(bounds.origin.x + 44, bounds.origin.y + 4, 44, 44);
+    _urlField.frame = CGRectMake(bounds.origin.x + 92, bounds.origin.y + 6, MAX(0, bounds.size.width - 100), 40);
     bounds.origin.y += 52;
     bounds.size.height = MAX(0, bounds.size.height - 52);
     _scrollView.frame = bounds;
@@ -409,6 +483,12 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
 {
     (void)scrollView;
     [self renderPage];
+}
+
+- (void)scrollViewWillBeginDragging:(UIScrollView*)scrollView
+{
+    (void)scrollView;
+    _restoreScrollUntil = 0;
 }
 
 - (void)pumpEngine
@@ -430,6 +510,17 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
         static_cast<int>(_scrollView.contentOffset.x), static_cast<int>(_scrollView.contentOffset.y), scale);
     auto contentSize = _client->content_size();
     _scrollView.contentSize = CGSizeMake(contentSize.width(), contentSize.height());
+    if (_restoreScrollUntil > CACurrentMediaTime()) {
+        auto offset = CGPointMake(MIN(_restoreScrollOffset.x, MAX(0, contentSize.width() - bounds.size.width)),
+            MIN(_restoreScrollOffset.y, MAX(0, contentSize.height() - bounds.size.height)));
+        if (!CGPointEqualToPoint(offset, _scrollView.contentOffset)) {
+            _scrollView.contentOffset = offset;
+            bitmap = _client->render(static_cast<int>(bounds.size.width), static_cast<int>(bounds.size.height),
+                static_cast<int>(offset.x), static_cast<int>(offset.y), scale);
+        }
+        if (CGPointEqualToPoint(offset, _restoreScrollOffset))
+            _restoreScrollUntil = 0;
+    }
     _imageView.frame = _scrollView.bounds;
     if (!bitmap) {
         _statusLabel.text = @"LibWeb did not produce a frame.";
