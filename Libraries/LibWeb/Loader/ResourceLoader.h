@@ -40,6 +40,13 @@ public:
     using OnCachedBodyAvailable = GC::Function<void(Core::ImmutableBytes data)>;
     using OnComplete = GC::Function<void(bool success, Requests::RequestTimingInfo const& timing_info, Optional<StringView> error_message)>;
 
+    // Embedders without RequestServer can supply an asynchronous, main-thread transport.
+    // Redirects must be returned to Fetch rather than followed by the transport.
+    // The transport owns the callback roots until completion. Individual request
+    // cancellation and transfer leases are not supported by this embedding path.
+    using NetworkLoader = Function<void(LoadRequest const&, GC::Root<OnHeadersReceived>, GC::Root<OnDataReceived>, GC::Root<OnComplete>)>;
+    static void initialize(GC::Heap&, NetworkLoader);
+
     RefPtr<Requests::Request> load(LoadRequest&, GC::Root<OnHeadersReceived>, GC::Root<OnDataReceived>, GC::Root<OnCachedBodyAvailable>, GC::Root<OnComplete>, Requests::RequestClient::TransferLease = Requests::RequestClient::TransferLease::No);
 
     RefPtr<Requests::RequestClient>& request_client() { return m_request_client; }
@@ -74,7 +81,8 @@ public:
     void set_enable_global_privacy_control(bool enable) { m_enable_global_privacy_control = enable; }
 
 private:
-    explicit ResourceLoader(GC::Heap&, NonnullRefPtr<Requests::RequestClient>);
+    explicit ResourceLoader(GC::Heap&, RefPtr<Requests::RequestClient>);
+    NetworkLoader m_network_loader;
 
     struct FileLoadResult {
         ReadonlyBytes data;

@@ -48,6 +48,12 @@ bool ResourceLoader::is_initialized()
     return resource_loader() != nullptr;
 }
 
+void ResourceLoader::initialize(GC::Heap& heap, NetworkLoader loader)
+{
+    resource_loader() = adopt_ref(*new ResourceLoader(heap, nullptr));
+    resource_loader()->m_network_loader = move(loader);
+}
+
 ResourceLoader& ResourceLoader::the()
 {
     if (!resource_loader()) {
@@ -57,14 +63,15 @@ ResourceLoader& ResourceLoader::the()
     return *resource_loader();
 }
 
-ResourceLoader::ResourceLoader(GC::Heap& heap, NonnullRefPtr<Requests::RequestClient> request_client)
+ResourceLoader::ResourceLoader(GC::Heap& heap, RefPtr<Requests::RequestClient> request_client)
     : m_heap(heap)
     , m_user_agent(MUST(String::from_utf8(default_user_agent)))
     , m_platform(MUST(String::from_utf8(default_platform)))
     , m_preferred_languages({ "en-US"_string })
     , m_navigator_compatibility_mode(default_navigator_compatibility_mode)
 {
-    set_client(move(request_client));
+    if (request_client)
+        set_client(request_client.release_nonnull());
 }
 
 void ResourceLoader::set_client(NonnullRefPtr<Requests::RequestClient> request_client)
@@ -437,6 +444,15 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
         auto not_implemented_error = ByteString::formatted("Protocol not implemented: {}", url.scheme());
         log_failure(request, not_implemented_error);
         on_complete->function()(false, {}, not_implemented_error);
+        return nullptr;
+    }
+
+    if (m_network_loader) {
+        auto headers_received = GC::create_function(m_heap, [this, request, on_headers_received](Requests::Request* protocol_request, HTTP::HeaderList const& headers, Optional<u32> status, Optional<String> const& reason, Optional<Core::ImmutableBytes> bytecode, Optional<u64> vary_key, Requests::CameFromCache cache) {
+            handle_network_response_headers(request, headers);
+            on_headers_received->function()(protocol_request, headers, status, reason, move(bytecode), vary_key, cache);
+        });
+        m_network_loader(request, move(headers_received), move(on_data_received), move(on_complete));
         return nullptr;
     }
 

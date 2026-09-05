@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include "Networking.h"
 #include <LibCore/AnonymousBuffer.h>
 #include <LibCore/EventLoop.h>
 #include <LibCore/ResourceImplementationFile.h>
@@ -125,6 +126,7 @@ public:
         auto document = m_page->top_level_traversable()->active_document();
         document->remove_all_children();
         document->set_url(url);
+        document->set_origin(url.origin());
         document->set_content_type("text/html"_utf16_fly_string);
         auto parser = Web::HTML::HTMLParser::create_from_byte_string(*document, html, Web::HTML::ParserScriptingMode::Disabled, "UTF-8"sv);
         parser->run(url);
@@ -230,6 +232,7 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     GC::Root<DemoPageClient> _client;
     BOOL _loaded;
     BOOL _rendering;
+    CADisplayLink* _displayLink;
 }
 
 - (void)viewDidLoad
@@ -247,7 +250,7 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     _urlField.spellCheckingType = UITextSpellCheckingTypeNo;
     _urlField.clearButtonMode = UITextFieldViewModeWhileEditing;
     _urlField.delegate = self;
-    _urlField.text = @"https://www.dr.dk/";
+    _urlField.text = [NSUserDefaults.standardUserDefaults stringForKey:@"URL"] ?: @"https://www.dr.dk/";
     [self.view addSubview:_urlField];
     _scrollView = [[UIScrollView alloc] init];
     _scrollView.delegate = self;
@@ -272,8 +275,13 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     auto& installedProvider = Gfx::FontDatabase::the().install_system_font_provider(make<IOSFontProvider>());
     Web::Platform::FontPlugin::install(*new Web::Platform::FontPlugin(false, &installedProvider));
     Web::Bindings::initialize_main_thread_vm(Web::HTML::AgentType::SimilarOriginWindow);
+    install_networking();
     _client = DemoPageClient::create();
     _client->initialize();
+
+    _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(pumpEngine)];
+    _displayLink.preferredFramesPerSecond = 30;
+    [_displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
 
     [self loadAddress];
 }
@@ -295,6 +303,7 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     auto targetURL = [NSURL URLWithString:address];
     auto scheme = targetURL.scheme.lowercaseString;
     [_loadTask cancel];
+    cancel_network_requests();
     auto generation = ++_loadGeneration;
     _loaded = NO;
     _scrollView.contentOffset = CGPointZero;
@@ -354,6 +363,12 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
 {
     (void)scrollView;
     [self renderPage];
+}
+
+- (void)pumpEngine
+{
+    if (Core::EventLoop::current().pump(Core::EventLoop::WaitMode::PollForEvents) > 0 && _loaded)
+        [self.view setNeedsLayout];
 }
 
 - (void)renderPage

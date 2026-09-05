@@ -1,4 +1,4 @@
-add_executable(ladybird MACOSX_BUNDLE main.mm)
+add_executable(ladybird MACOSX_BUNDLE main.mm Networking.mm)
 set_target_properties(ladybird PROPERTIES
     OUTPUT_NAME Ladybird
     OBJCXX_STANDARD 23

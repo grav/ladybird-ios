@@ -20,15 +20,23 @@ UIKit provides scrolling and inertia while LibWeb repaints a viewport-sized
 bitmap at the current offset, rather than allocating a full-page image.
 
 The initial scope is one static page. There is no JavaScript execution, link
-navigation via page links, external subresource loader, GPU compositor, or browser
+navigation via page links, GPU compositor, or browser
 helper process. The default LibWeb `PageClient` implementations are used for
 unimplemented browser callbacks. This is an embedding experiment, not a browser
 for arbitrary sites.
 
-DR's HTML renders in the simulator, but without its external stylesheets, images,
-or scripts. Expect unstyled navigation and oversized inline icons, not the full
-DR homepage. The original example.com smoke test uses inline CSS and needs no
-external resources.
+External stylesheets (including CSS imports) load through an optional in-process
+ResourceLoader transport backed by NSURLSession. LibWeb handles redirects and
+stylesheet MIME checks. A display link pumps engine tasks and repaints after
+asynchronous updates. Images, downloaded fonts, and scripts are not enabled yet.
+This remains an incomplete rendering of sites such as DR.
+
+The transport currently supports GET requests only, buffers each response, and
+rejects bodies over 16 MiB after download. It uses an ephemeral session with no
+automatic cookies or credential storage. Navigation cancels outstanding resource
+tasks; individual Fetch cancellation, cache transfers, and detailed network
+timings are not implemented. The initial HTML load is still a simplified native
+fetch rather than full LibWeb navigation (including response-header policies).
 
 ## Build
 
@@ -86,3 +94,19 @@ Check that the image shows DR navigation and page content, not just
 the native loading label. CSS layout and scroll offsets remain in points while
 the display list and bitmap use device pixels, preserving page size at Retina
 resolution. Text is rasterized by Skia/FreeType, not CoreText.
+
+## Resource-loading smoke test
+
+Run `python3 UI/iOS/Tests/server.py` in another terminal, then:
+
+```sh
+xcrun simctl terminate booted org.ladybird.ios-demo
+xcrun simctl launch booted org.ladybird.ios-demo -URL http://localhost:8765/
+xcrun simctl io booted screenshot Build/ios-simulator/resources.png
+```
+
+The linked CSS box must be green, the imported CSS box blue, and the wrong-MIME
+paragraph visible. A missing stylesheet must not block rendering. The fixture's
+`/requests` endpoint lists received requests to verify the redirect and import.
+These checks and live Hacker News stylesheet rendering passed on the simulator.
+`-URL` is an optional launch argument for choosing a test page without editing code.
