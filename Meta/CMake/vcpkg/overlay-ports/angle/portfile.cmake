@@ -54,6 +54,16 @@ vcpkg_from_github(
         002-bsd-support.patch
 )
 
+if ("headers-only" IN_LIST FEATURES)
+    if ("metal" IN_LIST FEATURES)
+        message(FATAL_ERROR "ANGLE headers-only and metal features are mutually exclusive")
+    endif()
+    # Keep ANGLE's headers in a separate directory from opengl-registry's headers.
+    file(INSTALL "${SOURCE_PATH}/include/" DESTINATION "${CURRENT_PACKAGES_DIR}/include/angle")
+    vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/LICENSE")
+    return()
+endif()
+
 # Generate angle_commit.h
 set(ANGLE_COMMIT_HASH_SIZE 12)
 string(SUBSTRING "${ANGLE_COMMIT}" 0 ${ANGLE_COMMIT_HASH_SIZE} ANGLE_COMMIT_HASH)

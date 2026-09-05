@@ -57,7 +57,7 @@ set(SOURCES
     YUVData.cpp
 )
 
-if (APPLE)
+if (APPLE AND NOT IOS)
     list(APPEND SOURCES MetalContext.mm)
 endif()
 

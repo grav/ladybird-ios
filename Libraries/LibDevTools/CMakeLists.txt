@@ -44,7 +44,7 @@ set(SOURCES
     StorageHelpers.cpp
 )
 
-if (APPLE)
+if (APPLE AND NOT IOS)
     list(APPEND SOURCES LaunchApplicationMacOS.mm)
     set_source_files_properties(LaunchApplicationMacOS.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
 endif()
@@ -52,6 +52,6 @@ endif()
 ladybird_lib(LibDevTools devtools EXPLICIT_SYMBOL_EXPORT)
 target_link_libraries(LibDevTools PRIVATE LibCore LibFileSystem LibHTTP LibWeb LibURL)
 
-if (APPLE)
+if (APPLE AND NOT IOS)
     target_link_libraries(LibDevTools PRIVATE "-framework AppKit")
 endif()

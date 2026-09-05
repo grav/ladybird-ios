@@ -26,6 +26,10 @@
     "zlib"
   ],
   "features": {
+    "headers-only": {
+      "description": "Install only headers for software-rendered LibWeb embeddings",
+      "supports": "ios"
+    },
     "metal": {
       "description": "Metal support for angle",
       "supports": "ios, osx"

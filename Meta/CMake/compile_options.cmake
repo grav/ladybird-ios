@@ -210,8 +210,14 @@ if (LINUX)
 endif()
 
 if (APPLE)
-    list(APPEND CMAKE_PREFIX_PATH /opt/homebrew)
+    if (NOT IOS)
+        list(APPEND CMAKE_PREFIX_PATH /opt/homebrew)
+    endif()
     add_cxx_link_options(LINKER:-dead_strip)
+endif()
+
+if (IOS)
+    add_compile_definitions(__IOS__)
 endif()
 
 if (HAIKU)

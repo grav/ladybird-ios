@@ -30,6 +30,16 @@ project(ladybird
     HOMEPAGE_URL "https://ladybird.org"
 )
 
+if (IOS)
+    # CMake's iOS platform may leave this empty even when an architecture is selected.
+    if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
+        set(CMAKE_SYSTEM_PROCESSOR arm64)
+    endif()
+    enable_language(OBJCXX)
+    set(CMAKE_OBJCXX_STANDARD 23)
+    set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
+endif()
+
 if (ANDROID OR IOS)
     set(BUILD_SHARED_LIBS OFF)
 endif()
@@ -134,8 +144,12 @@ if (NOT (ENABLE_FUZZERS OR ENABLE_COMPILER_EXPLORER_BUILD OR ANDROID OR IOS))
 endif()
 
 if (ENABLE_GUI_TARGETS)
-    add_subdirectory(Services)
-    add_subdirectory(UI)
+    if (IOS)
+        add_subdirectory(UI/iOS)
+    else()
+        add_subdirectory(Services)
+        add_subdirectory(UI)
+    endif()
 endif()
 
 add_custom_target(lint-shell-scripts

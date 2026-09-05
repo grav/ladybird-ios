@@ -20,6 +20,8 @@
 #include <core/SkTypeface.h>
 #if defined(AK_OS_ANDROID)
 #    include <ports/SkFontMgr_android.h>
+#elif defined(AK_OS_IOS)
+#    include <ports/SkFontMgr_empty.h>
 #elif defined(AK_OS_WINDOWS)
 #    include <ports/SkFontMgr_empty.h>
 #    include <ports/SkTypeface_win.h>
@@ -89,6 +91,8 @@ static SkFontMgr& font_manager()
 #endif
 #if defined(AK_OS_ANDROID)
         font_manager = SkFontMgr_New_Android(nullptr);
+#elif defined(AK_OS_IOS)
+        font_manager = SkFontMgr_New_Custom_Empty();
 #elif defined(AK_OS_WINDOWS)
         if (Gfx::FontDatabase::the().force_freetype_rasterization())
             font_manager = SkFontMgr_New_Custom_Empty();

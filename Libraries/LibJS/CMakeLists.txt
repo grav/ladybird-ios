@@ -1,6 +1,7 @@
 include(libjs_generators)
 
 build_rust_binary(
+    HOST
     MANIFEST_PATH Flap/Cargo.toml
     CRATE_NAME flapc
     BINARY_NAME generate-libjs-bytecode
@@ -367,12 +368,13 @@ if (DEFINED FLAP_ARCH)
 
     add_custom_command(
         OUTPUT "${INTERPRETER_LAYOUT_FILE}"
-        COMMAND "$<TARGET_FILE:generate_interpreter_layout>" > "${INTERPRETER_LAYOUT_FILE}"
+        COMMAND generate_interpreter_layout > "${INTERPRETER_LAYOUT_FILE}"
         DEPENDS generate_interpreter_layout
         COMMENT "Generating JS interpreter layout"
     )
 
     build_rust_binary(
+        HOST
         MANIFEST_PATH Flap/Cargo.toml
         CRATE_NAME flapc
         BINARY_NAME flapc

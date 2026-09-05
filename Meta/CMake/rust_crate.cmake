@@ -116,13 +116,18 @@ endfunction()
 #
 # Builds a Rust binary crate target using cargo and exposes the copied binary path through OUTPUT_PATH_VAR.
 function(build_rust_binary)
-    cmake_parse_arguments(PARSE_ARGV 0 ARG "" "MANIFEST_PATH;CRATE_NAME;BINARY_NAME;OUTPUT_NAME;OUTPUT_PATH_VAR;FFI_OUTPUT_DIR" "FEATURES")
+    cmake_parse_arguments(PARSE_ARGV 0 ARG "HOST" "MANIFEST_PATH;CRATE_NAME;BINARY_NAME;OUTPUT_NAME;OUTPUT_PATH_VAR;FFI_OUTPUT_DIR" "FEATURES")
 
     if (NOT ARG_OUTPUT_NAME)
         set(ARG_OUTPUT_NAME "${ARG_BINARY_NAME}")
     endif()
 
+    set(host_flag "")
+    if (ARG_HOST AND CMAKE_CROSSCOMPILING)
+        set(host_flag HOST)
+    endif()
     _rust_crate_common_setup(
+        ${host_flag}
         MANIFEST_PATH "${ARG_MANIFEST_PATH}"
         CRATE_NAME ${ARG_CRATE_NAME}
         FFI_OUTPUT_DIR "${ARG_FFI_OUTPUT_DIR}"
@@ -177,7 +182,7 @@ endfunction()
 
 # Shared cargo setup for import_rust_crate() and build_rust_binary().
 function(_rust_crate_common_setup)
-    cmake_parse_arguments(PARSE_ARGV 0 ARG "" "MANIFEST_PATH;CRATE_NAME;FFI_OUTPUT_DIR;TARGET_DIR" "")
+    cmake_parse_arguments(PARSE_ARGV 0 ARG "HOST" "MANIFEST_PATH;CRATE_NAME;FFI_OUTPUT_DIR;TARGET_DIR" "")
 
     set(manifest_path "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_MANIFEST_PATH}")
 
@@ -204,6 +209,20 @@ function(_rust_crate_common_setup)
         string(REGEX MATCH "host: ([^\n]+)" _ "${rustc_verbose}")
         string(STRIP "${CMAKE_MATCH_1}" host_triple)
         set(RUST_TARGET_TRIPLE "${host_triple}" CACHE INTERNAL "Rust target triple")
+    endif()
+
+    if (ARG_HOST)
+        execute_process(COMMAND "${RUST_RUSTC}" -vV OUTPUT_VARIABLE rustc_verbose COMMAND_ERROR_IS_FATAL ANY)
+        string(REGEX MATCH "host: ([^\n]+)" _ "${rustc_verbose}")
+        string(STRIP "${CMAKE_MATCH_1}" RUST_TARGET_TRIPLE)
+        find_program(RUST_HOST_CC cc REQUIRED NO_CMAKE_FIND_ROOT_PATH)
+        find_program(RUST_HOST_CXX c++ REQUIRED NO_CMAKE_FIND_ROOT_PATH)
+        set(CMAKE_C_COMPILER "${RUST_HOST_CC}")
+        set(CMAKE_CXX_COMPILER "${RUST_HOST_CXX}")
+        if (CMAKE_HOST_APPLE)
+            execute_process(COMMAND xcrun --sdk macosx --show-sdk-path
+                OUTPUT_VARIABLE CMAKE_OSX_SYSROOT OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+        endif()
     endif()
 
     # Build the uppercased and underscored variants of the target triple.

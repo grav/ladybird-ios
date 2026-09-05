@@ -10,6 +10,13 @@
     },
     {
       "name": "angle",
+      "platform": "ios",
+      "features": [
+        "headers-only"
+      ]
+    },
+    {
+      "name": "angle",
       "platform": "linux | windows | android | bsd"
     },
     "brotli",
@@ -42,6 +49,7 @@
     "fast-float",
     {
       "name": "ffmpeg",
+      "platform": "!ios",
       "features": [
         "avcodec",
         "avformat",
@@ -56,6 +64,16 @@
         "zlib"
       ]
     },
+    {
+      "name": "ffmpeg",
+      "platform": "ios",
+      "default-features": false,
+      "features": [
+        "avcodec",
+        "avformat",
+        "swresample"
+      ]
+    },
     "fmt",
     {
       "name": "fontconfig",
@@ -63,7 +81,7 @@
     },
     {
       "name": "harfbuzz",
-      "platform": "linux | bsd | windows",
+      "platform": "linux | bsd | windows | ios",
       "features": [
         "freetype",
         "icu"
@@ -97,12 +115,12 @@
     },
     {
       "name": "libproxy",
-      "platform": "!(android | bsd)"
+      "platform": "!(android | bsd | ios)"
     },
     "libpsl",
     {
       "name": "libedit",
-      "platform": "!windows & !android"
+      "platform": "!windows & !android & !ios"
     },
     "libtommath",
     {
@@ -188,6 +206,17 @@
       "features": [
         "metal",
         "fontconfig",
+        "harfbuzz",
+        "icu"
+      ]
+    },
+    {
+      "name": "skia",
+      "platform": "ios",
+      "default-features": false,
+      "features": [
+        "freetype",
+        "metal",
         "harfbuzz",
         "icu"
       ]
