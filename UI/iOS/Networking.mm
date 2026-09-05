@@ -70,8 +70,9 @@ void install_networking()
     s_session = [NSURLSession sessionWithConfiguration:configuration delegate:[[DemoNetworkDelegate alloc] init] delegateQueue:nil];
     s_tasks = [NSMutableSet set];
     Web::ResourceLoader::initialize(Web::Bindings::main_thread_vm().heap(), [](Web::LoadRequest const& load, auto headers, auto data, auto complete) {
-        // Start with stylesheets only. Scripts remain disabled in the embedding.
-        if (load.method() != "GET"sv || load.destination() != Web::Fetch::Infrastructure::Request::Destination::Style) {
+        // Only passive resources are supported. Scripts remain disabled.
+        using Destination = Web::Fetch::Infrastructure::Request::Destination;
+        if (load.method() != "GET"sv || (load.destination() != Destination::Style && load.destination() != Destination::Image)) {
             complete->function()(false, {}, "Resource type is not supported by the iOS demo"sv);
             return;
         }

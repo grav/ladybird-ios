@@ -1,4 +1,4 @@
-add_executable(ladybird MACOSX_BUNDLE main.mm Networking.mm)
+add_executable(ladybird MACOSX_BUNDLE main.mm Networking.mm Images.cpp)
 set_target_properties(ladybird PROPERTIES
     OUTPUT_NAME Ladybird
     OBJCXX_STANDARD 23
@@ -12,7 +12,7 @@ set_target_properties(ladybird PROPERTIES
 target_compile_options(ladybird PRIVATE -fobjc-arc
     -Wno-unqualified-std-cast-call -Wno-user-defined-literals
     -Wno-unknown-warning-option -Wno-invalid-offsetof)
-target_link_libraries(ladybird PRIVATE AK LibCore LibGfx LibJS LibWeb LibURL
+target_link_libraries(ladybird PRIVATE AK LibCore LibGfx LibImageDecoders LibJS LibWeb LibURL
     "-framework UIKit" "-framework CoreGraphics" "-framework CoreText")
 
 add_custom_command(TARGET ladybird POST_BUILD

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include "Images.h"
 #include "Networking.h"
 #include <LibCore/AnonymousBuffer.h>
 #include <LibCore/EventLoop.h>
@@ -276,6 +277,7 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     Web::Platform::FontPlugin::install(*new Web::Platform::FontPlugin(false, &installedProvider));
     Web::Bindings::initialize_main_thread_vm(Web::HTML::AgentType::SimilarOriginWindow);
     install_networking();
+    install_image_decoder();
     _client = DemoPageClient::create();
     _client->initialize();
 

@@ -28,8 +28,15 @@ for arbitrary sites.
 External stylesheets (including CSS imports) load through an optional in-process
 ResourceLoader transport backed by NSURLSession. LibWeb handles redirects and
 stylesheet MIME checks. A display link pumps engine tasks and repaints after
-asynchronous updates. Images, downloaded fonts, and scripts are not enabled yet.
-This remains an incomplete rendering of sites such as DR.
+asynchronous updates. External images and CSS backgrounds also load; downloaded
+fonts and scripts are not enabled yet. This remains an incomplete rendering of
+sites such as DR.
+
+Raster images use Ladybird's LibImageDecoders in-process on the engine thread;
+SVG images use LibWeb's SVG support. The demo displays only the first frame of
+animated images, rejects raster dimensions above 16 megapixels, and preserves
+decoded color profiles and premultiplied alpha. There is no isolated decoder
+process, and large decodes can temporarily block the UI.
 
 The transport currently supports GET requests only, buffers each response, and
 rejects bodies over 16 MiB after download. It uses an ephemeral session with no
@@ -106,7 +113,9 @@ xcrun simctl io booted screenshot Build/ios-simulator/resources.png
 ```
 
 The linked CSS box must be green, the imported CSS box blue, and the wrong-MIME
-paragraph visible. A missing stylesheet must not block rendering. The fixture's
+paragraph visible. Both the image and CSS background must show red on the left
+and blue on the right; invalid PNG data must show the broken-image fallback.
+A missing stylesheet must not block rendering. The fixture's
 `/requests` endpoint lists received requests to verify the redirect and import.
 These checks and live Hacker News stylesheet rendering passed on the simulator.
 `-URL` is an optional launch argument for choosing a test page without editing code.

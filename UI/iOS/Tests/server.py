@@ -3,6 +3,19 @@
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import struct
+import zlib
+
+
+def test_png():
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+
+    # A tiny red/blue raster fixture, generated without third-party dependencies.
+    pixels = b"\x00\xff\x00\x00\x00\x00\xff" * 2
+    return (b"\x89PNG\r\n\x1a\n"
+            + chunk(b"IHDR", struct.pack(">IIBBBBB", 2, 2, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(pixels)) + chunk(b"IEND", b""))
 
 
 HTML = b'''<!doctype html><meta name="viewport" content="width=device-width">
@@ -15,6 +28,10 @@ HTML = b'''<!doctype html><meta name="viewport" content="width=device-width">
 <p id="imported">Imported CSS: blue background</p>
 <p id="mime">Wrong MIME: must stay visible</p>
 <p>Missing CSS must not prevent this page from rendering.</p>
+<p>Image: red left half, blue right half</p>
+<img src="/test.png" width="120" height="60" alt="Raster image failed">
+<div id="background" style="width:120px;height:60px">CSS background</div>
+<p><img src="/broken.png" alt="Broken image fallback"></p>
 <div style="height: 1100px">Scroll down to the bottom marker.</div>
 <p id="bottom">Bottom marker</p>'''
 
@@ -32,7 +49,10 @@ class Handler(BaseHTTPRequestHandler):
         routes = {
             "/": ("text/html; charset=utf-8", HTML),
             "/style.css": ("text/css", b'@import "/import.css"; body {font: 18px Helvetica; margin: 20px} #linked {background: #b8efb8; padding: 12px}'),
-            "/import.css": ("text/css", b'#imported {background: #bbddff; padding: 12px}'),
+            "/import.css": ("text/css", b'#imported {background: #bbddff; padding: 12px} #background {background-image: url(/background.png); background-size: 100% 100%; color: white}'),
+            "/test.png": ("image/png", test_png()),
+            "/background.png": ("image/png", test_png()),
+            "/broken.png": ("image/png", b"invalid PNG"),
             "/wrong-mime.css": ("text/plain", b'#mime {display:none}'),
             "/requests": ("application/json", json.dumps(REQUESTS).encode()),
         }
