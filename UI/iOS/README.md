@@ -40,9 +40,14 @@ for arbitrary sites.
 External stylesheets (including CSS imports) load through an optional in-process
 ResourceLoader transport backed by NSURLSession. LibWeb handles redirects and
 stylesheet MIME checks. A display link pumps engine tasks and repaints after
-asynchronous updates. External images and CSS backgrounds also load; downloaded
-fonts and scripts are not enabled yet. This remains an incomplete rendering of
+asynchronous updates. External images, CSS backgrounds, and downloaded
+`@font-face` fonts also load; scripts are not enabled yet. This remains an incomplete rendering of
 sites such as DR.
+
+Font requests use LibWeb's existing font parsing and CORS checks. Same-origin
+fonts and cross-origin fonts with appropriate response headers are supported;
+blocked or malformed fonts fall back to the selected system family. TTF and
+WOFF2 loading have been verified with the local fixture.
 
 Raster images use Ladybird's LibImageDecoders in-process on the engine thread;
 SVG images use LibWeb's SVG support. The demo displays only the first frame of
@@ -137,3 +142,8 @@ second link below the fold. Both must load `/destination`, including after
 scrolling. Blank page taps must leave the address unchanged.
 For history, follow the scrolled link, go Back, check the restored offset, and go
 Forward. Then go Back and enter a different address: Forward must be disabled.
+
+The `/fonts` fixture verifies same-origin TTF, cross-origin allowed/denied TTF,
+invalid-font fallback, and WOFF2 Ethiopic glyphs. The first two samples must use
+the distinctive bundled test font fetched over HTTP; CORS-denied and invalid
+samples must remain in Helvetica. No font CORS bypass is used.

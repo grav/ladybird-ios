@@ -5,6 +5,23 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import struct
 import zlib
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[3]
+FONTS_HTML = '''<!doctype html><style>
+body {font: 20px Helvetica; margin:20px}
+@font-face {font-family: Same; src:url(/font.ttf)}
+@font-face {font-family: Allowed; src:url(http://127.0.0.1:8765/font-cors.ttf)}
+@font-face {font-family: Blocked; src:url(http://127.0.0.1:8765/font-blocked.ttf)}
+@font-face {font-family: Invalid; src:url(/invalid.woff2)}
+@font-face {font-family: Woff2; src:url(/ethiopic.woff2)}
+</style><h1>Downloaded fonts</h1>
+<p>First two samples must use chunky test letters. Denied and invalid samples must use Helvetica.</p>
+<p style="font-family:Same,Helvetica">Same origin: ABC abc 123</p>
+<p style="font-family:Allowed,Helvetica">CORS allowed: ABC abc 123</p>
+<p style="font-family:Blocked,Helvetica">CORS denied: ABC abc 123</p>
+<p style="font-family:Invalid,Helvetica">Invalid font: ABC abc 123</p>
+<p style="font-family:Woff2,Helvetica">WOFF2 Ethiopic: ሰላም</p>'''.encode()
 
 
 def test_png():
@@ -47,6 +64,12 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         routes = {
+            "/fonts": ("text/html; charset=utf-8", FONTS_HTML),
+            "/font.ttf": ("font/ttf", (REPO / "Base/res/fonts/SerenitySans-Regular.ttf").read_bytes()),
+            "/font-cors.ttf": ("font/ttf", (REPO / "Base/res/fonts/SerenitySans-Regular.ttf").read_bytes()),
+            "/font-blocked.ttf": ("font/ttf", (REPO / "Base/res/fonts/SerenitySans-Regular.ttf").read_bytes()),
+            "/invalid.woff2": ("font/woff2", b"invalid font"),
+            "/ethiopic.woff2": ("font/woff2", (REPO / "Tests/LibWeb/Assets/NotoSansEthiopic.woff2").read_bytes()),
             "/links": ("text/html", b'<!doctype html><base href="/nested/"><style>body {margin:20px} a {display:block; padding:20px}</style><a href="../destination"><span>Tap nested text to follow relative link</span></a><div style="height:1000px"></div><a href="../destination">Scrolled link</a>'),
             "/destination": ("text/html", b'<!doctype html><h1>Link navigation passed</h1>'),
             "/": ("text/html; charset=utf-8", HTML),
@@ -63,6 +86,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Content-Type-Options", "nosniff")
+        if self.path == "/font-cors.ttf":
+            self.send_header("Access-Control-Allow-Origin", "http://localhost:8765")
         self.end_headers()
         self.wfile.write(body)
 
