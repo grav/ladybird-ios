@@ -396,8 +396,9 @@ if (DEFINED FLAP_ARCH)
         OR ENABLE_UNDEFINED_SANITIZER)
         list(APPEND FLAP_EXTRA_FLAGS "--enable-assertions")
     endif()
-    # All Apple Silicon chips are ARMv8.5+ which includes FEAT_JSCVT.
-    if ("${FLAP_ARCH}" STREQUAL "aarch64" AND APPLE)
+    # Apple Silicon Macs support FEAT_JSCVT, but the generic iOS target does
+    # not guarantee it. Use the portable conversion sequence there.
+    if ("${FLAP_ARCH}" STREQUAL "aarch64" AND APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         list(APPEND FLAP_EXTRA_FLAGS "--has-jscvt")
     endif()
 
