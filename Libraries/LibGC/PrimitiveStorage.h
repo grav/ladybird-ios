@@ -30,7 +30,14 @@ public:
         Yes,
     };
 
+#if defined(AK_OS_IOS)
+    // The desktop reservation exceeds the virtual address space available to
+    // an ordinary iOS app. Keep this a power of two so both C++ accessors and
+    // the generated interpreter use the same bounded offset mask.
+    static constexpr size_t default_cage_size = 256ull * MiB;
+#else
     static constexpr size_t default_cage_size = 4ull * TiB;
+#endif
     static_assert(is_power_of_two(default_cage_size));
     static constexpr size_t cage_offset_mask = default_cage_size - 1;
     static constexpr size_t invalid_offset = NumericLimits<size_t>::max();

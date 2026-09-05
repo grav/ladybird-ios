@@ -147,10 +147,10 @@ choose another attached device. App installation and debugger/device-image
 support are separate checks.
 
 The arm64 device build, development IPA export, signature validation, and
-installation on an iPhone running iOS 26.6.1 have been verified. On this Mac,
-ad-hoc export currently requires repairing the expired Xcode account credentials;
-development export works with the existing local profile. Device rendering has
-not yet been checked.
+installation on an iPhone running iOS 26.6.1 have been verified using development
+signing. The initial ad-hoc export reported command-line credential errors;
+this does not establish the sign-in state shown in Xcode's UI. Device rendering
+has not yet been checked.
 
 The signing project has a placeholder entry point which its mandatory build
 phase replaces with the real CMake-built device executable and resources. The
@@ -164,6 +164,13 @@ debug a build-time helper on the phone.
 
 The device build uses the interpreter's portable numeric conversion sequence;
 unlike Apple Silicon Macs, the generic iOS target does not guarantee FEAT_JSCVT.
+
+iOS also limits the primitive-storage cage to 256 MiB instead of the desktop
+4 TiB virtual address reservation, which failed during VM startup on a physical
+iPhone. The C++ bounds mask and generated interpreter mask derive from the same
+constant; the guard page remains outside that range. This is an address-space
+reservation, not a 256 MiB allocation at launch. Primitive-storage allocations
+must fit within this shared limit; it is not a limit on total app memory.
 
 ## Port details
 

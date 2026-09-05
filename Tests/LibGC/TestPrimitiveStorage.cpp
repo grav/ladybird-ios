@@ -178,6 +178,15 @@ TEST_CASE(invalid_handle)
     EXPECT_EQ(storage.capacity(handle), 0u);
 }
 
+TEST_CASE(cage_offset_mask_matches_reservation)
+{
+    constexpr auto size = GC::PrimitiveStorage::default_cage_size;
+    EXPECT_EQ(GC::PrimitiveStorage::mask_offset(size - 1), size - 1);
+    EXPECT_EQ(GC::PrimitiveStorage::mask_offset(size), 0u);
+    EXPECT_EQ(GC::PrimitiveStorage::mask_offset(size + 1), 1u);
+    EXPECT_EQ(GC::PrimitiveStorage::mask_offset(NumericLimits<size_t>::max()), size - 1);
+}
+
 TEST_CASE(cage_has_tail_guard_outside_logical_size)
 {
     auto& storage = GC::PrimitiveStorage::the();
