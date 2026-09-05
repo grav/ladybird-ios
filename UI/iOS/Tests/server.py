@@ -47,6 +47,8 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         routes = {
+            "/links": ("text/html", b'<!doctype html><base href="/nested/"><style>body {margin:20px} a {display:block; padding:20px}</style><a href="../destination"><span>Tap nested text to follow relative link</span></a><div style="height:1000px"></div><a href="../destination">Scrolled link</a>'),
+            "/destination": ("text/html", b'<!doctype html><h1>Link navigation passed</h1>'),
             "/": ("text/html; charset=utf-8", HTML),
             "/style.css": ("text/css", b'@import "/import.css"; body {font: 18px Helvetica; margin: 20px} #linked {background: #b8efb8; padding: 12px}'),
             "/import.css": ("text/css", b'#imported {background: #bbddff; padding: 12px} #background {background-image: url(/background.png); background-size: 100% 100%; color: white}'),

@@ -16,6 +16,7 @@
 #include <LibURL/Parser.h>
 #include <LibWeb/Bindings/MainThreadVM.h>
 #include <LibWeb/DOM/Document.h>
+#include <LibWeb/HTML/HTMLAnchorElement.h>
 #include <LibWeb/HTML/LocalTraversableNavigable.h>
 #include <LibWeb/HTML/PaintConfig.h>
 #include <LibWeb/HTML/Parser/HTMLParser.h>
@@ -25,6 +26,7 @@
 #include <LibWeb/Painting/DisplayListPlayerSkia.h>
 #include <LibWeb/Painting/DisplayListResourceStorage.h>
 #include <LibWeb/Painting/DocumentPaintState.h>
+#include <LibWeb/Painting/HitTestResult.h>
 #include <LibWeb/Painting/PaintableTypes.h>
 #include <LibWeb/Painting/Scrolling.h>
 #include <LibWeb/Platform/EventLoopPlugin.h>
@@ -134,6 +136,25 @@ public:
     }
 
     Gfx::IntSize content_size() const { return m_content_size; }
+
+    Optional<URL::URL> link_at(double x, double y)
+    {
+        auto document = m_page->top_level_traversable()->active_document();
+        auto hit = document->hit_test({ Web::CSSPixels(x), Web::CSSPixels(y) });
+        if (!hit.has_value())
+            return {};
+        for (auto* node = hit->dom_node(); node; node = node->parent_or_shadow_host()) {
+            if (auto* anchor = as_if<Web::HTML::HTMLAnchorElement>(node)) {
+                if (!anchor->has_attribute(Web::HTML::AttributeNames::href) || anchor->has_attribute(Web::HTML::AttributeNames::download))
+                    return {};
+                auto url = URL::Parser::basic_parse(anchor->href().to_utf8_but_should_be_ported_to_utf16());
+                if (url.has_value() && url->scheme().is_one_of("http"sv, "https"sv))
+                    return url;
+                return {};
+            }
+        }
+        return {};
+    }
 
     RefPtr<Gfx::Bitmap> render(int width, int height, int scroll_x, int scroll_y, double scale)
     {
@@ -262,6 +283,8 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     _imageView = [[UIImageView alloc] init];
     _imageView.contentMode = UIViewContentModeScaleToFill;
     [_scrollView addSubview:_imageView];
+    auto tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(pageTapped:)];
+    [_scrollView addGestureRecognizer:tap];
     _statusLabel = [[UILabel alloc] init];
     _statusLabel.numberOfLines = 0;
     _statusLabel.textAlignment = NSTextAlignmentCenter;
@@ -293,6 +316,27 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     [textField resignFirstResponder];
     [self loadAddress];
     return YES;
+}
+
+- (void)pageTapped:(UITapGestureRecognizer*)recognizer
+{
+    if (!_loaded || recognizer.state != UIGestureRecognizerStateEnded)
+        return;
+    auto point = [recognizer locationInView:_scrollView];
+    // LibWeb hit testing takes viewport CSS coordinates, not Retina pixels or
+    // UIScrollView content coordinates. Scroll translation happens in LibWeb.
+    [self followLinkAt:CGPointMake(point.x - _scrollView.bounds.origin.x, point.y - _scrollView.bounds.origin.y)];
+}
+
+- (void)followLinkAt:(CGPoint)point
+{
+    auto url = _client->link_at(point.x, point.y);
+    if (!url.has_value())
+        return;
+    auto serialized = url->serialize();
+    _urlField.text = [[NSString alloc] initWithBytes:serialized.bytes().data() length:serialized.bytes().size() encoding:NSUTF8StringEncoding];
+    [_urlField resignFirstResponder];
+    [self loadAddress];
 }
 
 - (void)loadAddress

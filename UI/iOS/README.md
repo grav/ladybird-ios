@@ -19,8 +19,13 @@ returns to the top. Drag the page to scroll; the address field stays fixed.
 UIKit provides scrolling and inertia while LibWeb repaints a viewport-sized
 bitmap at the current offset, rather than allocating a full-page image.
 
-The initial scope is one static page. There is no JavaScript execution, link
-navigation via page links, GPU compositor, or browser
+Tap HTML links to load their targets in the current view. LibWeb hit testing
+handles nested link content, scroll offsets, and relative URLs (including base
+URLs). Downloads and non-HTTP(S) links are ignored. This is URL navigation, not
+full pointer-event dispatch; forms, new windows, and fragment scrolling are not
+implemented yet.
+
+There is no JavaScript execution, GPU compositor, or browser
 helper process. The default LibWeb `PageClient` implementations are used for
 unimplemented browser callbacks. This is an embedding experiment, not a browser
 for arbitrary sites.
@@ -119,3 +124,7 @@ A missing stylesheet must not block rendering. The fixture's
 `/requests` endpoint lists received requests to verify the redirect and import.
 These checks and live Hacker News stylesheet rendering passed on the simulator.
 `-URL` is an optional launch argument for choosing a test page without editing code.
+
+The `/links` fixture tests nested text in a relative link under a base URL and a
+second link below the fold. Both must load `/destination`, including after
+scrolling. Blank page taps must leave the address unchanged.
