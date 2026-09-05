@@ -98,8 +98,72 @@ xcrun simctl install booted Build/ios-simulator/bin/Ladybird.app
 xcrun simctl launch booted org.ladybird.ios-demo
 ```
 
-A physical device build is not wired up. It would need a device triplet, signing,
-and a different way to execute the target layout generator.
+## Physical device and ad-hoc distribution
+
+The device target uses a separate build tree and `iphoneos` dependencies. Install
+the `aarch64-apple-ios` Rust target, then use the same compiler arguments as above
+with `IOS_TARGET=device`:
+
+```sh
+rustup target add aarch64-apple-ios
+IOS_TARGET=device bash UI/iOS/configure.sh \
+    -DCMAKE_C_COMPILER="${ios_llvm_prefix}/bin/clang" \
+    -DCMAKE_CXX_COMPILER="${ios_llvm_prefix}/bin/clang++" \
+    -DCMAKE_OBJCXX_COMPILER="${ios_llvm_prefix}/bin/clang++" \
+    -DCMAKE_ASM_COMPILER="${ios_llvm_prefix}/bin/clang"
+bash UI/iOS/build-ad-hoc.sh
+```
+
+XcodeGen is required for packaging. The script follows Radarvejr's automatic
+Xcode archive/export workflow using team `A6AAKKNUW9` and bundle identifier
+`dk.klokke.ladybird`. Change these settings in `Distribution/` for another team.
+Xcode must have access to that developer account and the destination device must
+be included in the ad-hoc provisioning profile. Each run keeps its archive and
+IPA in a fresh directory under `Build/ios-distribution`, printing the IPA path.
+Nothing is submitted to the App Store or TestFlight.
+
+If distribution signing is unavailable but a local development profile includes
+the phone, explicitly choose development signing instead:
+
+```sh
+EXPORT_OPTIONS_PLIST="$PWD/UI/iOS/Distribution/DevelopmentExportOptions.plist" \
+    bash UI/iOS/build-ad-hoc.sh
+```
+
+This produces a development-signed IPA, not an ad-hoc distribution IPA. It needs
+Developer Mode enabled on the phone. The script does not silently downgrade
+the signing method when an ad-hoc export fails.
+
+For a paired phone, install the exported IPA without a debugger using:
+
+```sh
+uv run UI/iOS/install-ipa.py --udid DEVICE_UDID /path/to/Ladybird.ipa
+```
+
+Add `--developer` for a development-signed IPA. The native transport uses macOS's
+existing device connection and closes it explicitly after checking that the app
+is installed. Select the iPhone's UDID explicitly rather than allowing a tool to
+choose another attached device. App installation and debugger/device-image
+support are separate checks.
+
+The arm64 device build, development IPA export, signature validation, and
+installation on an iPhone running iOS 26.6.1 have been verified. On this Mac,
+ad-hoc export currently requires repairing the expired Xcode account credentials;
+development export works with the existing local profile. Device rendering has
+not yet been checked.
+
+The signing project has a placeholder entry point which its mandatory build
+phase replaces with the real CMake-built device executable and resources. The
+phase rejects simulator binaries; Xcode then signs and packages the app.
+
+An arm64 simulator must still be booted during the device build. The layout
+generator is compiled for the device ABI, then a temporary copy has only its
+Mach-O platform metadata changed so it can run in the simulator. The actual app
+and libraries are never retargeted this way. This avoids needing to install and
+debug a build-time helper on the phone.
+
+The device build uses the interpreter's portable numeric conversion sequence;
+unlike Apple Silicon Macs, the generic iOS target does not guarantee FEAT_JSCVT.
 
 ## Port details
 

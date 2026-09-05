@@ -1,0 +1,42 @@
+name: LadybirdDistribution
+options:
+  deploymentTarget:
+    iOS: "18.0"
+targets:
+  Ladybird:
+    type: application
+    platform: iOS
+    sources:
+      - main.c
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dk.klokke.ladybird
+        PRODUCT_NAME: Ladybird
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 0.1
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Ladybird
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: A6AAKKNUW9
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        DEBUG_INFORMATION_FORMAT: dwarf
+    postBuildScripts:
+      - name: Install device-built LibWeb demo
+        basedOnDependencyAnalysis: false
+        script: |
+          set -eu
+          test -n "$LADYBIRD_APP_PATH"
+          test -f "$LADYBIRD_APP_PATH/Ladybird"
+          xcrun vtool -show-build "$LADYBIRD_APP_PATH/Ladybird" | /usr/bin/grep -q 'platform IOS$'
+          /usr/bin/ditto "$LADYBIRD_APP_PATH/Ladybird" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
+          /usr/bin/ditto "$LADYBIRD_APP_PATH/res" "$TARGET_BUILD_DIR/$WRAPPER_NAME/res"
+schemes:
+  Ladybird:
+    build:
+      targets:
+        Ladybird: all
+    archive:
+      config: Release
