@@ -13,7 +13,11 @@
 
 namespace GC {
 
-#if AK_IS_ARCH_RISCV64()
+#if defined(AK_OS_IOS)
+// An ordinary iOS app cannot reserve the generic AArch64 heap region. Leave
+// room for the temporary double-sized alignment mapping and primitive storage.
+static constexpr size_t HEAP_REGION_SIZE = 1ull * GiB;
+#elif AK_IS_ARCH_RISCV64()
 // Sv39 provides 256 GiB of user virtual address space after splitting the
 // address space between userspace and the kernel. Keep room for the second
 // region-sized reservation used to align the cage base.

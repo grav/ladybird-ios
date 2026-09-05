@@ -171,6 +171,9 @@ iPhone. The C++ bounds mask and generated interpreter mask derive from the same
 constant; the guard page remains outside that range. This is an address-space
 reservation, not a 256 MiB allocation at launch. Primitive-storage allocations
 must fit within this shared limit; it is not a limit on total app memory.
+The separate GC heap region is 1 GiB on iOS (temporarily reserving 2 GiB to align
+its base), instead of the generic AArch64 128 GiB region. Its pointer mask is
+likewise shared by C++ and the generated interpreter.
 
 ## Port details
 

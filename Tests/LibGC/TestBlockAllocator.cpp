@@ -22,6 +22,9 @@ TEST_CASE(all_blocks_share_one_reserved_region)
     EXPECT(region_start < region_end);
     EXPECT_EQ(region_start, js_heap_region_base);
     EXPECT_EQ(region_start % GC::HEAP_REGION_SIZE, 0u);
+    EXPECT_EQ(region_end - region_start, GC::HEAP_REGION_SIZE);
+    EXPECT_EQ(GC::HEAP_REGION_SIZE & GC::HEAP_REGION_OFFSET_MASK, 0u);
+    EXPECT_EQ((GC::HEAP_REGION_SIZE - 1) & GC::HEAP_REGION_OFFSET_MASK, GC::HEAP_REGION_SIZE - 1);
 
     auto first_address = reinterpret_cast<FlatPtr>(first_block);
     auto second_address = reinterpret_cast<FlatPtr>(second_block);
