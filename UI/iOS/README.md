@@ -1,228 +1,82 @@
 # Experimental iOS LibWeb demo
 
-This minimal embedding demo builds and runs in the iOS Simulator. The complete
-engine build and live example.com rendering have been verified on an iPhone 16
-simulator running iOS 18.1, using the iOS 18.2 SDK and LLVM 21.
+A small UIKit browser powered by Ladybird's own LibWeb engine, not a WebKit
+wrapper. It opens Hacker News by default and supports a URL bar, scrolling,
+links, back/forward history, CSS, images, and web fonts. It runs in the simulator
+and has been confirmed working on a physical iPhone. JavaScript, forms, and
+full browser navigation are not implemented.
 
-The demo defaults to Hacker News (`https://news.ycombinator.com/`), fetches with `NSURLSession`, parses and lays out
-the response with LibWeb, and replays its display list into a software bitmap
-shown by UIKit. Rendering happens locally on iOS at the screen's native scale
-and renders again when the view changes size. CoreText discovers installed font
-directories, which are loaded through Skia/FreeType. Generic families use
-Helvetica, Times New Roman, and Courier New, with bundled SerenitySans only as
-an emergency fallback. The layout-test font override is disabled.
+## What made the port difficult
 
-The address field at the top loads a new page when you press Go. Bare hostnames
-default to HTTPS. Only HTTP and HTTPS URLs are accepted; iOS transport security
-may block plain HTTP. Starting another load cancels the previous request and
-returns to the top. Drag the page to scroll; the address field stays fixed.
-UIKit provides scrolling and inertia while LibWeb repaints a viewport-sized
-bitmap at the current offset, rather than allocating a full-page image.
+### Cross-compiling the engine and its dependencies
 
-Tap HTML links to load their targets in the current view. LibWeb hit testing
-handles nested link content, scroll offsets, and relative URLs (including base
-URLs). Downloads and non-HTTP(S) links are ignored. This is URL navigation, not
-full pointer-event dispatch; forms, new windows, and fragment scrolling are not
-implemented yet.
+Building only a small UI still means building much of Ladybird's engine.
+The port uses LLVM 21 for the required C++ features, Xcode's iOS SDKs, and Rust
+with separate simulator and device targets. Custom vcpkg triplets keep
+`iphonesimulator` and `iphoneos` dependencies in separate build trees:
+sharing the ARM64 architecture does not make their binaries interchangeable.
 
-Back and Forward buttons maintain in-memory URL history. Successful loads add
-entries; failed or cancelled loads do not. Back/forward refetch the HTML and
-restore the saved scroll offset (allowing up to three seconds for asynchronous
-layout growth). Dragging cancels pending scroll restoration. Navigating to a new
-URL after going back removes the forward entries. This is not a back/forward
-document cache, and history does not persist across app launches.
+Desktop UI and helper-process targets had to be excluded, along with macOS-only
+AppKit, CoreServices, and IOKit integrations. ANGLE supplies headers only,
+FFmpeg uses a reduced feature set, and Skia renders in software.
 
-There is no JavaScript execution, GPU compositor, or browser
-helper process. The default LibWeb `PageClient` implementations are used for
-unimplemented browser callbacks. This is an embedding experiment, not a browser
-for arbitrary sites.
+### Running code generators while cross-compiling
 
-External stylesheets (including CSS imports) load through an optional in-process
-ResourceLoader transport backed by NSURLSession. LibWeb handles redirects and
-stylesheet MIME checks. A display link pumps engine tasks and repaints after
-asynchronous updates. External images, CSS backgrounds, and downloaded
-`@font-face` fonts also load; scripts are not enabled yet. This remains an incomplete rendering of
-sites such as DR.
+LibJS generates interpreter assembly using field offsets measured by a C++
+layout probe. Running that probe as a normal Mac executable would not establish
+the target ABI. The simulator build runs it inside a booted ARM64 simulator.
 
-Font requests use LibWeb's existing font parsing and CORS checks. Same-origin
-fonts and cross-origin fonts with appropriate response headers are supported;
-blocked or malformed fonts fall back to the selected system family. TTF and
-WOFF2 loading have been verified with the local fixture.
+For the device build, the probe is compiled for the device ABI. A temporary copy
+has its Mach-O platform metadata changed so this small, Foundation-free tool can
+run in the simulator. The shipped app and libraries are never retargeted this
+way. Rust code generators run on the Mac.
 
-Raster images use Ladybird's LibImageDecoders in-process on the engine thread;
-SVG images use LibWeb's SVG support. The demo displays only the first frame of
-animated images, rejects raster dimensions above 16 megapixels, and preserves
-decoded color profiles and premultiplied alpha. There is no isolated decoder
-process, and large decodes can temporarily block the UI.
+The interpreter also assumed Apple ARM targets supported FEAT_JSCVT, which the
+generic iOS assembler target did not enable. iOS now uses the existing portable
+numeric conversion sequence instead.
 
-The transport currently supports GET requests only, buffers each response, and
-rejects bodies over 16 MiB after download. It uses an ephemeral session with no
-automatic cookies or credential storage. Navigation cancels outstanding resource
-tasks; individual Fetch cancellation, cache transfers, and detailed network
-timings are not implemented. The initial HTML load is still a simplified native
-fetch rather than full LibWeb navigation (including response-header policies).
+### Replacing desktop browser services
 
-## Build
+The minimal app has no separate networking, decoding, or compositor processes.
+An in-process `NSURLSession` transport supplies resources to LibWeb, while image
+decoding runs locally. UIKit displays Skia's software bitmap and handles
+scrolling; a display link pumps engine tasks and repaints as resources arrive.
 
-The current build path targets an **arm64 iOS 18+ Simulator on an Apple Silicon
-Mac**. Xcode must include the iOS Simulator SDK, and a simulator must be booted
-during the build: LibJS's C++ layout generator executes there so its offsets
-match the target ABI. The Rust code generators run on the Mac.
+Fonts needed separate attention: CoreText discovers installed font files,
+Skia/FreeType loads them, and the layout-test font override is disabled.
+Layout stays in points while rendering uses device pixels for Retina output.
 
-Install the normal Ladybird build prerequisites, including CMake, Ninja, LLVM 21, and
-the Rust version specified by `rust-toolchain.toml`. With rustup installed, add
-the target standard library from the repository root:
+### Getting past device-only startup crashes
 
-```sh
-rustup target add aarch64-apple-ios-sim
-python3 Meta/Utils/build_vcpkg.py
-open -a Simulator
-ios_llvm_prefix="$(brew --prefix llvm@21)"
-bash UI/iOS/configure.sh \
-    -DCMAKE_C_COMPILER="${ios_llvm_prefix}/bin/clang" \
-    -DCMAKE_CXX_COMPILER="${ios_llvm_prefix}/bin/clang++" \
-    -DCMAKE_OBJCXX_COMPILER="${ios_llvm_prefix}/bin/clang++" \
-    -DCMAKE_ASM_COMPILER="${ios_llvm_prefix}/bin/clang"
-cmake --build Build/ios-simulator --target ladybird -j2
-```
+A successful simulator build did not guarantee a working iPhone app. Crash
+reports revealed two virtual-address reservations that were too large:
 
-`VCPKG_ROOT` can select a separate bootstrapped checkout at this repository's
-pinned vcpkg baseline. Extra arguments to `configure.sh` are passed to CMake,
-including `-DRUST_CARGO=...` and `-DRUST_RUSTC=...` for a standalone Rust install.
-Dependencies and build outputs go under `Build/ios-simulator`.
+- Primitive storage reserved 4 TiB; the iOS limit is now 256 MiB.
+- The generic ARM64 GC heap reserved 128 GiB, temporarily doubled for alignment.
+  iOS now uses a 1 GiB region with a temporary 2 GiB alignment reservation.
 
-After a successful build, install and launch the bundle:
+These reserve address space, not that much physical RAM. Both C++ and generated
+interpreter masks derive from the respective limits, keeping pointer encoding
+and bounds consistent.
 
-```sh
-xcrun simctl install booted Build/ios-simulator/bin/Ladybird.app
-xcrun simctl launch booted org.ladybird.ios-demo
-```
+The next crash came from creating the theme's anonymous buffer. POSIX
+shared-memory backing was replaced on iOS with immediately unlinked files in
+the app's private temporary directory. Shared mappings and snapshots remain
+supported; all 11 anonymous-buffer tests passed in the simulator.
 
-## Physical device and ad-hoc distribution
+### Signing and installing a CMake-built app
 
-The device target uses a separate build tree and `iphoneos` dependencies. Install
-the `aarch64-apple-ios` Rust target, then use the same compiler arguments as above
-with `IOS_TARGET=device`:
+CMake builds the real executable; a small XcodeGen project packages it. Its
+mandatory build phase replaces a placeholder with the device executable and
+resources, rejects simulator binaries, and lets Xcode sign and export the app.
 
-```sh
-rustup target add aarch64-apple-ios
-IOS_TARGET=device bash UI/iOS/configure.sh \
-    -DCMAKE_C_COMPILER="${ios_llvm_prefix}/bin/clang" \
-    -DCMAKE_CXX_COMPILER="${ios_llvm_prefix}/bin/clang++" \
-    -DCMAKE_OBJCXX_COMPILER="${ios_llvm_prefix}/bin/clang++" \
-    -DCMAKE_ASM_COMPILER="${ios_llvm_prefix}/bin/clang"
-bash UI/iOS/build-ad-hoc.sh
-```
+Ad-hoc export initially reported command-line credential errors, so the working
+device installs used an explicitly selected development profile. Installation
+was another separate hurdle: Xcode's developer disk image did not support the
+phone, but installation without a debugger worked through macOS's native device
+connection using `pymobiledevice3`.
 
-XcodeGen is required for packaging. The script follows Radarvejr's automatic
-Xcode archive/export workflow using team `A6AAKKNUW9` and bundle identifier
-`dk.klokke.ladybird`. Change these settings in `Distribution/` for another team.
-Xcode must have access to that developer account and the destination device must
-be included in the ad-hoc provisioning profile. Each run keeps its archive and
-IPA in a fresh directory under `Build/ios-distribution`, printing the IPA path.
-Nothing is submitted to the App Store or TestFlight.
+## Building and testing
 
-If distribution signing is unavailable but a local development profile includes
-the phone, explicitly choose development signing instead:
-
-```sh
-EXPORT_OPTIONS_PLIST="$PWD/UI/iOS/Distribution/DevelopmentExportOptions.plist" \
-    bash UI/iOS/build-ad-hoc.sh
-```
-
-This produces a development-signed IPA, not an ad-hoc distribution IPA. It needs
-Developer Mode enabled on the phone. The script does not silently downgrade
-the signing method when an ad-hoc export fails.
-
-For a paired phone, install the exported IPA without a debugger using:
-
-```sh
-uv run UI/iOS/install-ipa.py --udid DEVICE_UDID /path/to/Ladybird.ipa
-```
-
-Add `--developer` for a development-signed IPA. The native transport uses macOS's
-existing device connection and closes it explicitly after checking that the app
-is installed. Select the iPhone's UDID explicitly rather than allowing a tool to
-choose another attached device. App installation and debugger/device-image
-support are separate checks.
-
-The arm64 device build, development IPA export, signature validation, and
-installation on an iPhone running iOS 26.6.1 have been verified using development
-signing. The initial ad-hoc export reported command-line credential errors;
-this does not establish the sign-in state shown in Xcode's UI. Device rendering
-has not yet been checked.
-
-The signing project has a placeholder entry point which its mandatory build
-phase replaces with the real CMake-built device executable and resources. The
-phase rejects simulator binaries; Xcode then signs and packages the app.
-
-An arm64 simulator must still be booted during the device build. The layout
-generator is compiled for the device ABI, then a temporary copy has only its
-Mach-O platform metadata changed so it can run in the simulator. The actual app
-and libraries are never retargeted this way. This avoids needing to install and
-debug a build-time helper on the phone.
-
-The device build uses the interpreter's portable numeric conversion sequence;
-unlike Apple Silicon Macs, the generic iOS target does not guarantee FEAT_JSCVT.
-
-iOS also limits the primitive-storage cage to 256 MiB instead of the desktop
-4 TiB virtual address reservation, which failed during VM startup on a physical
-iPhone. The C++ bounds mask and generated interpreter mask derive from the same
-constant; the guard page remains outside that range. This is an address-space
-reservation, not a 256 MiB allocation at launch. Primitive-storage allocations
-must fit within this shared limit; it is not a limit on total app memory.
-The separate GC heap region is 1 GiB on iOS (temporarily reserving 2 GiB to align
-its base), instead of the generic AArch64 128 GiB region. Its pointer mask is
-likewise shared by C++ and the generated interpreter.
-
-Anonymous buffers on iOS use immediately unlinked files in the app's private
-`TMPDIR`, avoiding POSIX shared-memory names that are unavailable in the device
-sandbox. Descriptor sharing, close-on-exec, zero-sized buffers, and snapshots
-are covered by the anonymous-buffer tests, which passed on the simulator.
-
-## Port details
-
-The iOS build selects the UIKit demo in place of the desktop UI and service
-executables. ANGLE supplies headers only; FFmpeg has a reduced feature set.
-Skia uses FreeType for system and bundled fonts. Desktop-only CoreServices, AppKit,
-and IOKit integrations are excluded on iOS.
-
-To check rendering after changes, launch the app and capture the simulator:
-
-```sh
-xcrun simctl io booted screenshot Build/ios-simulator/dr-dk.png
-```
-
-Check that the image shows DR navigation and page content, not just
-the native loading label. CSS layout and scroll offsets remain in points while
-the display list and bitmap use device pixels, preserving page size at Retina
-resolution. Text is rasterized by Skia/FreeType, not CoreText.
-
-## Resource-loading smoke test
-
-Run `python3 UI/iOS/Tests/server.py` in another terminal, then:
-
-```sh
-xcrun simctl terminate booted org.ladybird.ios-demo
-xcrun simctl launch booted org.ladybird.ios-demo -URL http://localhost:8765/
-xcrun simctl io booted screenshot Build/ios-simulator/resources.png
-```
-
-The linked CSS box must be green, the imported CSS box blue, and the wrong-MIME
-paragraph visible. Both the image and CSS background must show red on the left
-and blue on the right; invalid PNG data must show the broken-image fallback.
-A missing stylesheet must not block rendering. The fixture's
-`/requests` endpoint lists received requests to verify the redirect and import.
-These checks and live Hacker News stylesheet rendering passed on the simulator.
-`-URL` is an optional launch argument for choosing a test page without editing code.
-
-The `/links` fixture tests nested text in a relative link under a base URL and a
-second link below the fold. Both must load `/destination`, including after
-scrolling. Blank page taps must leave the address unchanged.
-For history, follow the scrolled link, go Back, check the restored offset, and go
-Forward. Then go Back and enter a different address: Forward must be disabled.
-
-The `/fonts` fixture verifies same-origin TTF, cross-origin allowed/denied TTF,
-invalid-font fallback, and WOFF2 Ethiopic glyphs. The first two samples must use
-the distinctive bundled test font fetched over HTTP; CORS-denied and invalid
-samples must remain in Helvetica. No font CORS bypass is used.
+See [BUILD.md](BUILD.md) for prerequisites, simulator and device builds, IPA
+export, installation, and smoke-test fixtures.
