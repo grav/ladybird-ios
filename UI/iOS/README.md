@@ -175,6 +175,11 @@ The separate GC heap region is 1 GiB on iOS (temporarily reserving 2 GiB to alig
 its base), instead of the generic AArch64 128 GiB region. Its pointer mask is
 likewise shared by C++ and the generated interpreter.
 
+Anonymous buffers on iOS use immediately unlinked files in the app's private
+`TMPDIR`, avoiding POSIX shared-memory names that are unavailable in the device
+sandbox. Descriptor sharing, close-on-exec, zero-sized buffers, and snapshots
+are covered by the anonymous-buffer tests, which passed on the simulator.
+
 ## Port details
 
 The iOS build selects the UIKit demo in place of the desktop UI and service

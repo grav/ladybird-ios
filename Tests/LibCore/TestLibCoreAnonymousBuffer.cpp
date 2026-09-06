@@ -42,6 +42,15 @@ TEST_CASE(create_with_size_produces_independent_buffers)
         EXPECT_EQ(*buffers[i].data<u8>(), i);
 }
 
+#ifndef AK_OS_WINDOWS
+TEST_CASE(anonymous_buffer_descriptor_is_close_on_exec)
+{
+    auto buffer = MUST(Core::AnonymousBuffer::create_with_size(64));
+    auto flags = MUST(Core::System::fcntl(buffer.fd(), F_GETFD));
+    EXPECT(flags & FD_CLOEXEC);
+}
+#endif
+
 TEST_CASE(default_constructed_is_invalid)
 {
     Core::AnonymousBuffer buffer;

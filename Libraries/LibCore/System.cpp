@@ -9,6 +9,7 @@
  */
 
 #include <AK/Atomic.h>
+#include <AK/ByteBuffer.h>
 #include <AK/ByteString.h>
 #include <AK/Random.h>
 #include <AK/ScopeGuard.h>
@@ -214,6 +215,29 @@ ErrorOr<int> anon_create([[maybe_unused]] size_t size, [[maybe_unused]] int opti
         linux_options |= MFD_ALLOW_SEALING;
 #    endif
     fd = memfd_create("", linux_options);
+#elif defined(AK_OS_IOS)
+    // The app sandbox does not provide a POSIX shared-memory namespace. Use
+    // an immediately unlinked file in the app's private temporary directory
+    // instead, preserving the descriptor-backed MAP_SHARED buffer contract.
+    auto* temporary_directory = getenv("TMPDIR");
+    if (!temporary_directory || !*temporary_directory)
+        return Error::from_string_literal("Anonymous buffers on iOS require an app temporary directory");
+    auto path = ByteString::formatted("{}/ladybird-anon-XXXXXX", temporary_directory);
+    auto pattern = TRY(ByteBuffer::copy(path.characters(), path.length() + 1));
+    auto* mutable_path = reinterpret_cast<char*>(pattern.data());
+    fd = ::mkstemp(mutable_path);
+    if (fd >= 0) {
+        if (::unlink(mutable_path) < 0) {
+            auto saved_errno = errno;
+            TRY(close(fd));
+            return Error::from_errno(saved_errno);
+        }
+        if ((options & O_CLOEXEC) && ::fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
+            auto saved_errno = errno;
+            TRY(close(fd));
+            return Error::from_errno(saved_errno);
+        }
+    }
 #elif defined(SHM_ANON)
     fd = shm_open(SHM_ANON, O_RDWR | O_CREAT | options, 0600);
 #elif defined(AK_OS_BSD_GENERIC) || defined(AK_OS_HAIKU)
