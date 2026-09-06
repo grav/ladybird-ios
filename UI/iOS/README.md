@@ -4,7 +4,7 @@ This minimal embedding demo builds and runs in the iOS Simulator. The complete
 engine build and live example.com rendering have been verified on an iPhone 16
 simulator running iOS 18.1, using the iOS 18.2 SDK and LLVM 21.
 
-The demo currently fetches `https://www.dr.dk/` with `NSURLSession`, parses and lays out
+The demo defaults to Hacker News (`https://news.ycombinator.com/`), fetches with `NSURLSession`, parses and lays out
 the response with LibWeb, and replays its display list into a software bitmap
 shown by UIKit. Rendering happens locally on iOS at the screen's native scale
 and renders again when the view changes size. CoreText discovers installed font

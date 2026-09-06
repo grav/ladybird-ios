@@ -299,7 +299,7 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     _urlField.spellCheckingType = UITextSpellCheckingTypeNo;
     _urlField.clearButtonMode = UITextFieldViewModeWhileEditing;
     _urlField.delegate = self;
-    _urlField.text = [NSUserDefaults.standardUserDefaults stringForKey:@"URL"] ?: @"https://www.dr.dk/";
+    _urlField.text = [NSUserDefaults.standardUserDefaults stringForKey:@"URL"] ?: @"https://news.ycombinator.com/";
     [self.view addSubview:_urlField];
     _scrollView = [[UIScrollView alloc] init];
     _scrollView.delegate = self;
@@ -315,7 +315,7 @@ GC_DEFINE_ALLOCATOR(DemoPageClient);
     _statusLabel = [[UILabel alloc] init];
     _statusLabel.numberOfLines = 0;
     _statusLabel.textAlignment = NSTextAlignmentCenter;
-    _statusLabel.text = @"Loading dr.dk…";
+    _statusLabel.text = @"Loading…";
     [self.view addSubview:_statusLabel];
 
     Core::EventLoop::initialize_for_current_thread();
