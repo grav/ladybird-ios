@@ -17,6 +17,14 @@ target_link_libraries(ladybird PRIVATE AK LibCore LibGfx LibImageDecoders LibJS 
 
 add_custom_command(TARGET ladybird POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/Icons"
+        "$<TARGET_BUNDLE_DIR:ladybird>"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
         "${LADYBIRD_SOURCE_DIR}/Base/res"
         "$<TARGET_BUNDLE_DIR:ladybird>/res"
+)
+
+set_property(TARGET ladybird APPEND PROPERTY LINK_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/Icons/AppIcon60x60@2x.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Icons/AppIcon76x76@2x~ipad.png"
 )

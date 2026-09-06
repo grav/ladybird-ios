@@ -13,6 +13,7 @@ output_dir="$(mktemp -d "${output_root}/ad-hoc.XXXXXX")"
 cmake --build "${source_dir}/Build/ios-device" --target ladybird -j "${BUILD_JOBS:-4}"
 xcrun vtool -show-build "$device_app/Ladybird" | rg -q 'platform IOS$'
 ditto "${source_dir}/UI/iOS/Distribution" "$output_dir/Project"
+ditto "${source_dir}/UI/iOS/Icons" "$output_dir/Project/Icons"
 xcodegen generate --spec "$output_dir/Project/project.yml"
 test -d "$output_dir/Project/LadybirdDistribution.xcodeproj"
 

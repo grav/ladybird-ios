@@ -63,6 +63,11 @@ be included in the ad-hoc provisioning profile. Each run keeps its archive and
 IPA in a fresh directory under `Build/ios-distribution`, printing the IPA path.
 Nothing is submitted to the App Store or TestFlight.
 
+The app uses PNG icons derived from the existing 1024px logo in
+`UI/Icons/macos/app_icon.iconset`. They are bundled directly using
+`CFBundleIcons`, without requiring an asset-catalog compiler or a matching
+simulator runtime during packaging.
+
 If distribution signing is unavailable but a local development profile includes
 the phone, explicitly choose development signing instead:
 

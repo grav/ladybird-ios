@@ -8,6 +8,17 @@ targets:
     platform: iOS
     sources:
       - main.c
+      - path: Icons
+        buildPhase: resources
+    info:
+      path: Info.plist
+      properties:
+        CFBundleIcons:
+          CFBundlePrimaryIcon:
+            CFBundleIconFiles: [AppIcon60x60]
+        CFBundleIcons~ipad:
+          CFBundlePrimaryIcon:
+            CFBundleIconFiles: [AppIcon60x60, AppIcon76x76]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dk.klokke.ladybird
